@@ -3,6 +3,7 @@ import warnings
 from pathlib import Path
 from dotenv import load_dotenv
 from rag_chat import RAGChat
+from cli_interface import CLIInterface, Config, Colors
 
 warnings.filterwarnings("ignore", message="Pydantic serializer warnings")
 
@@ -11,47 +12,82 @@ def load_environment():
     env_path = Path(__file__).parent / '.env'
     if env_path.exists():
         load_dotenv(env_path)
-        print("Environment variables loaded from .env file")
+        return True, "Environment variables loaded from .env file"
     else:
-        print("No .env file found, using system environment variables")
+        return False, "No .env file found, using system environment variables"
+
+
+def check_environment_variables():
+    missing_vars = []
+    for var in Config.ENV_VARS:
+        if not os.environ.get(var):
+            missing_vars.append(var)
+    return missing_vars
 
 
 def main():
-    load_environment()
+    cli = CLIInterface(Config.APP_NAME)
+
+    cli.clear_screen()
+    cli.print_welcome_banner()
+
+    env_loaded, env_message = load_environment()
+
+    statuses = []
+    statuses.append((env_loaded, env_message))
+
+    missing_vars = check_environment_variables()
+    if missing_vars:
+        statuses.append((False, "Missing required environment variables"))
+        cli.print_status_box(statuses)
+        cli.print_environment_error(missing_vars)
+        return
+    else:
+        statuses.append((True, "All environment variables configured"))
 
     try:
-        rag = RAGChat()
-        print("RAG Chat initialized successfully!")
-        print("=" * 50)
-        print("Welcome to RAG Chat with Vectorize and OpenAI")
-        print("Type 'quit' or 'exit' to end the session")
-        print("=" * 50)
+        rag = RAGChat(cli)
+        statuses.append((True, "RAG Chat initialized successfully"))
+        statuses.append((True, "Connected to Vectorize and OpenAI"))
+        cli.print_status_box(statuses)
+
+        cli.print_exit_instructions()
 
         while True:
-            question = input("\nYour question: ").strip()
+            try:
+                question = cli.get_user_input()
 
-            if question.lower() in ['quit', 'exit']:
-                print("Goodbye!")
-                break
+                if question.lower() in Config.QUIT_COMMANDS:
+                    cli.print_goodbye()
+                    break
 
-            if not question:
-                print("Please enter a question.")
+                if not question:
+                    cli.print_warning("Please enter a question")
+                    continue
+
+                answer = rag.chat(question)
+                cli.print_answer(answer)
+
+            except KeyboardInterrupt:
+                cli.print_info("\nOperation cancelled")
+                continue
+            except Exception as e:
+                cli.print_error(f"An error occurred: {e}")
                 continue
 
-            print("\n" + "-" * 50)
-            answer = rag.chat(question)
-            print("-" * 50)
-            print(f"\nAnswer: {answer}")
-
     except Exception as e:
-        print(f"Error initializing RAG Chat: {e}")
-        print(
-            "Please make sure all required environment variables are set in your .env file:")
-        print("- OPENAI_API_KEY")
-        print("- VECTORIZE_PIPELINE_ACCESS_TOKEN")
-        print("- VECTORIZE_ORGANIZATION_ID")
-        print("- VECTORIZE_PIPELINE_ID")
+        statuses.append((False, f"Failed to initialize RAG Chat: {str(e)}"))
+        cli.print_status_box(statuses)
+        cli.print_error(f"Error: {e}")
+
+        if missing_vars:
+            cli.print_environment_error(missing_vars)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        cli = CLIInterface()
+        cli.print_info("\nApplication interrupted")
+        cli.print_goodbye()

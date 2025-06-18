@@ -3,12 +3,14 @@ import warnings
 from typing import List, Dict, Any
 from litellm import completion
 from vectorize_wrapper import VectorizeWrapper
+from cli_interface import Config
 
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
 
 class RAGChat:
-    def __init__(self):
+    def __init__(self, cli_interface):
+        self.cli = cli_interface
         self.vectorize = VectorizeWrapper()
         self.openai_api_key = os.environ.get("OPENAI_API_KEY")
 
@@ -40,11 +42,14 @@ class RAGChat:
         messages = [
             {
                 "role": "system",
-                "content": "You are a helpful assistant that answers questions based on the provided context. If the context doesn't contain relevant information, say so."
+                "content": Config.SYSTEM_PROMPT
             },
             {
                 "role": "user",
-                "content": f"Context:\n{context}\n\nQuestion: {question}\n\nPlease provide a comprehensive answer based on the context above."
+                "content": Config.USER_PROMPT_TEMPLATE.format(
+                    context=context,
+                    question=question
+                )
             }
         ]
 
@@ -57,18 +62,15 @@ class RAGChat:
         except Exception as e:
             return f"Error generating response: {e}"
 
-    def chat(self, question: str, num_results: int = 5) -> str:
-        print(f"Retrieving documents for: {question}")
+    def chat(self, question: str, num_results: int = Config.DEFAULT_NUM_RESULTS) -> str:
+        self.cli.print_retrieving(question)
         documents = self.vectorize.retrieve_documents(question, num_results)
 
-        if documents:
-            print(f"Found {len(documents)} relevant documents")
-        else:
-            print("No documents found")
+        self.cli.print_document_count(len(documents) if documents else 0)
 
         context = self.format_context(documents)
 
-        print("Generating answer...")
+        self.cli.print_generating()
         answer = self.generate_answer(question, context)
 
         return answer
