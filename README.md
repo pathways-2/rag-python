@@ -23,7 +23,7 @@ uv sync
 3. **Run the application**:
 
 ```bash
-python run_rag.py
+uv run run_rag.py
 ```
 
 ## Configuration
