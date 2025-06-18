@@ -4,4 +4,8 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "litellm>=1.72.6",
+    "vectorize-client>=0.2.1",
+    "python-dotenv>=1.0.0",
+]
