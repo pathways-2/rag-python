@@ -8,6 +8,7 @@ from rag_source_base import RAGSourceType, RAGSourceBase
 from vectorize_wrapper import VectorizeWrapper
 from pinecone_wrapper import PineconeWrapper
 
+# This is just to suppress warnings in our terminal
 warnings.filterwarnings("ignore", message="Pydantic serializer warnings")
 
 RAG_SOURCE = RAGSourceType.VECTORIZE

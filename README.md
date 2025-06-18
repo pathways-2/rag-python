@@ -23,14 +23,14 @@ uv sync
 3. **Run the application**:
 
 ```bash
-uv run run_rag.py
+uv run main.py
 ```
 
 ## Configuration
 
 ### Choosing a RAG Source
 
-Edit `run_rag.py` and modify the `RAG_SOURCE` variable:
+Edit `main.py` and modify the `RAG_SOURCE` variable:
 
 ```python
 from rag_source_base import RAGSourceType
@@ -100,7 +100,7 @@ OPENAI_API_KEY=your-openai-api-key-here
 
 ```
 rag-python/
-├── run_rag.py              # Main application entry point
+├── main.py              # Main application entry point
 ├── rag_chat.py             # Core RAG chat logic
 ├── rag_source_base.py      # Base interface for RAG sources
 ├── vectorize_wrapper.py    # Vectorize.io implementation
@@ -119,7 +119,7 @@ rag-python/
 Run the main application:
 
 ```bash
-python run_rag.py
+python main.py
 ```
 
 The application will:
@@ -197,7 +197,7 @@ class RAGSourceType(Enum):
     MY_NEW_SOURCE = "my_new_source"  # Add this
 ```
 
-3. **Update** `get_rag_source()` in `run_rag.py`:
+3. **Update** `get_rag_source()` in `main.py`:
 
 ```python
 elif RAG_SOURCE == RAGSourceType.MY_NEW_SOURCE:
