@@ -1,17 +1,18 @@
 import os
 import warnings
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from litellm import completion
-from vectorize_wrapper import VectorizeWrapper
+from rag_source_base import RAGSourceBase
 from cli_interface import Config
 
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
 
 class RAGChat:
-    def __init__(self, cli_interface):
+    def __init__(self, cli_interface, rag_source: Optional[RAGSourceBase] = None):
         self.cli = cli_interface
-        self.vectorize = VectorizeWrapper()
+        self.rag_source = rag_source
+
         self.openai_api_key = os.environ.get("OPENAI_API_KEY")
 
         if not self.openai_api_key:
@@ -25,14 +26,19 @@ class RAGChat:
         for i, doc in enumerate(documents, 1):
             context += f"Document {i}:\n"
 
-            if hasattr(doc, 'text'):
-                context += f"Content: {doc.text}\n"
+            if hasattr(doc, 'text') or isinstance(doc, dict) and 'text' in doc:
+                text = doc.text if hasattr(doc, 'text') else doc['text']
+                context += f"Content: {text}\n"
 
-            if hasattr(doc, 'source_display_name'):
-                context += f"Source: {doc.source_display_name}\n"
+            if hasattr(doc, 'source_display_name') or isinstance(doc, dict) and 'source_display_name' in doc:
+                source = doc.source_display_name if hasattr(
+                    doc, 'source_display_name') else doc['source_display_name']
+                context += f"Source: {source}\n"
 
-            if hasattr(doc, 'relevancy'):
-                context += f"Relevance Score: {doc.relevancy}\n"
+            if hasattr(doc, 'relevancy') or isinstance(doc, dict) and 'relevancy' in doc:
+                score = doc.relevancy if hasattr(
+                    doc, 'relevancy') else doc['relevancy']
+                context += f"Relevance Score: {score}\n"
 
             context += "\n"
 
@@ -63,12 +69,17 @@ class RAGChat:
             return f"Error generating response: {e}"
 
     def chat(self, question: str, num_results: int = Config.DEFAULT_NUM_RESULTS) -> str:
-        self.cli.print_retrieving(question)
-        documents = self.vectorize.retrieve_documents(question, num_results)
+        if self.rag_source:
+            self.cli.print_retrieving(question)
+            documents = self.rag_source.retrieve_documents(
+                question, num_results)
 
-        self.cli.print_document_count(len(documents) if documents else 0)
+            self.cli.print_documents_with_snippets(documents)
 
-        context = self.format_context(documents)
+            context = self.format_context(documents)
+        else:
+            context = "No external knowledge base available. Please answer based on your general knowledge."
+            self.cli.print_info("Answering without document retrieval")
 
         self.cli.print_generating()
         answer = self.generate_answer(question, context)

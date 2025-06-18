@@ -4,8 +4,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 from rag_chat import RAGChat
 from cli_interface import CLIInterface, Config, Colors
+from rag_source_base import RAGSourceType, RAGSourceBase
+from vectorize_wrapper import VectorizeWrapper
+from pinecone_wrapper import PineconeWrapper
 
 warnings.filterwarnings("ignore", message="Pydantic serializer warnings")
+
+RAG_SOURCE = RAGSourceType.VECTORIZE
 
 
 def load_environment():
@@ -17,16 +22,46 @@ def load_environment():
         return False, "No .env file found, using system environment variables"
 
 
-def check_environment_variables():
+def get_rag_source() -> tuple[RAGSourceBase | None, list[str]]:
+    """
+    Create and return the appropriate RAG source based on configuration.
+    Returns tuple of (rag_source, required_env_vars)
+    """
+    if RAG_SOURCE == RAGSourceType.NONE:
+        return None, []
+    elif RAG_SOURCE == RAGSourceType.VECTORIZE:
+        wrapper = VectorizeWrapper()
+        return wrapper, wrapper.get_required_env_vars()
+    elif RAG_SOURCE == RAGSourceType.PINECONE:
+        wrapper = PineconeWrapper()
+        return wrapper, wrapper.get_required_env_vars()
+    else:
+        raise ValueError(f"Unknown RAG source type: {RAG_SOURCE}")
+
+
+def check_environment_variables(rag_source_vars: list[str]) -> list[str]:
     missing_vars = []
-    for var in Config.ENV_VARS:
+
+    core_vars = ["OPENAI_API_KEY"]
+    for var in core_vars:
         if not os.environ.get(var):
             missing_vars.append(var)
+
+    for var in rag_source_vars:
+        if not os.environ.get(var):
+            missing_vars.append(var)
+
     return missing_vars
 
 
 def main():
-    cli = CLIInterface(Config.APP_NAME)
+    app_name_suffix = {
+        RAGSourceType.NONE: "",
+        RAGSourceType.VECTORIZE: " with Vectorize",
+        RAGSourceType.PINECONE: " with Pinecone"
+    }
+    app_name = Config.APP_NAME + app_name_suffix.get(RAG_SOURCE, "")
+    cli = CLIInterface(app_name)
 
     cli.clear_screen()
     cli.print_welcome_banner()
@@ -36,7 +71,14 @@ def main():
     statuses = []
     statuses.append((env_loaded, env_message))
 
-    missing_vars = check_environment_variables()
+    try:
+        rag_source_instance, required_vars = get_rag_source()
+    except Exception as e:
+        statuses.append((False, f"Failed to initialize RAG source: {str(e)}"))
+        cli.print_status_box(statuses)
+        return
+
+    missing_vars = check_environment_variables(required_vars)
     if missing_vars:
         statuses.append((False, "Missing required environment variables"))
         cli.print_status_box(statuses)
@@ -46,9 +88,16 @@ def main():
         statuses.append((True, "All environment variables configured"))
 
     try:
-        rag = RAGChat(cli)
+        rag = RAGChat(cli, rag_source=rag_source_instance)
         statuses.append((True, "RAG Chat initialized successfully"))
-        statuses.append((True, "Connected to Vectorize and OpenAI"))
+
+        if RAG_SOURCE == RAGSourceType.VECTORIZE:
+            statuses.append((True, "Connected to Vectorize and OpenAI"))
+        elif RAG_SOURCE == RAGSourceType.PINECONE:
+            statuses.append((True, "Connected to Pinecone and OpenAI"))
+        else:
+            statuses.append((True, "Connected to OpenAI"))
+
         cli.print_status_box(statuses)
 
         cli.print_exit_instructions()

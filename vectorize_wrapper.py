@@ -1,9 +1,10 @@
 import vectorize_client as v
 import os
 from typing import List, Dict, Any
+from rag_source_base import RAGSourceBase
 
 
-class VectorizeWrapper:
+class VectorizeWrapper(RAGSourceBase):
     def __init__(self):
         self.access_token = os.environ.get("VECTORIZE_PIPELINE_ACCESS_TOKEN")
         self.organization_id = os.environ.get("VECTORIZE_ORGANIZATION_ID")
@@ -34,3 +35,10 @@ class VectorizeWrapper:
         except Exception as e:
             print(f"Error retrieving documents: {e}")
             return []
+
+    def get_required_env_vars(self) -> List[str]:
+        return [
+            "VECTORIZE_PIPELINE_ACCESS_TOKEN",
+            "VECTORIZE_ORGANIZATION_ID",
+            "VECTORIZE_PIPELINE_ID"
+        ]

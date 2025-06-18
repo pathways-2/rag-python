@@ -1,6 +1,8 @@
 import os
 import sys
-from typing import Optional, List
+import time
+import threading
+from typing import Optional, List, Any
 from pathlib import Path
 
 
@@ -30,10 +32,43 @@ class Icons:
     STAR = '✭'
 
 
+class LoadingAnimation:
+    def __init__(self, message: str, color: str = Colors.CYAN):
+        self.message = message
+        self.color = color
+        self.is_running = False
+        self.thread = None
+        self.frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+        self.current_frame = 0
+
+    def _animate(self):
+        while self.is_running:
+            frame = self.frames[self.current_frame]
+            sys.stdout.write(
+                f'\r{self.color}{frame} {self.message}{Colors.RESET}')
+            sys.stdout.flush()
+            self.current_frame = (self.current_frame + 1) % len(self.frames)
+            time.sleep(0.1)
+
+    def start(self):
+        self.is_running = True
+        self.thread = threading.Thread(target=self._animate)
+        self.thread.daemon = True
+        self.thread.start()
+
+    def stop(self):
+        self.is_running = False
+        if self.thread:
+            self.thread.join()
+        sys.stdout.write('\r' + ' ' * (len(self.message) + 4) + '\r')
+        sys.stdout.flush()
+
+
 class CLIInterface:
     def __init__(self, app_name: str = "RAG Chat"):
         self.app_name = app_name
         self.terminal_width = self._get_terminal_width()
+        self.current_loading = None
 
     def _get_terminal_width(self) -> int:
         try:
@@ -45,7 +80,7 @@ class CLIInterface:
         os.system('cls' if os.name == 'nt' else 'clear')
 
     def print_welcome_banner(self):
-        banner_text = f"Welcome to {self.app_name} with Vectorize and OpenAI"
+        banner_text = f"Welcome to {self.app_name}"
         padding = 4
         box_width = len(banner_text) + (padding * 2)
 
@@ -106,21 +141,79 @@ class CLIInterface:
     def print_thinking(self):
         print(f"\n{Colors.YELLOW}{Icons.DOT} Thinking...{Colors.RESET}")
 
+    def start_loading(self, message: str):
+        self.current_loading = LoadingAnimation(message)
+        self.current_loading.start()
+
+    def stop_loading(self):
+        if self.current_loading:
+            self.current_loading.stop()
+            self.current_loading = None
+
     def print_retrieving(self, query: str):
         print(
             f"\n{Colors.CYAN}{Icons.DOT} Retrieving documents for: {Colors.WHITE}\"{query}\"{Colors.RESET}")
+        self.start_loading("Searching knowledge base...")
 
-    def print_document_count(self, count: int):
-        if count > 0:
-            print(
-                f"{Colors.GREEN}{Icons.CHECK} Found {count} relevant document{'s' if count != 1 else ''}{Colors.RESET}")
-        else:
+    def print_documents_with_snippets(self, documents: List[Any]):
+        self.stop_loading()
+
+        if not documents:
             print(f"{Colors.YELLOW}{Icons.DOT} No documents found{Colors.RESET}")
+            return
+
+        count = len(documents)
+        print(f"\n{Colors.GREEN}{Icons.CHECK} Found {count} relevant document{'s' if count != 1 else ''}{Colors.RESET}")
+
+        print(f"\n{Colors.GRAY}{'─' * 60}{Colors.RESET}")
+
+        for i, doc in enumerate(documents[:5], 1):
+            snippet = ""
+            source = ""
+            score = ""
+
+            if hasattr(doc, 'text') and doc.text:
+                snippet = doc.text[:120].strip()
+                if len(doc.text) > 120:
+                    snippet += "..."
+            elif isinstance(doc, dict) and 'text' in doc:
+                snippet = doc['text'][:120].strip()
+                if len(doc['text']) > 120:
+                    snippet += "..."
+
+            if hasattr(doc, 'source_display_name') and doc.source_display_name:
+                source = doc.source_display_name
+            elif isinstance(doc, dict) and 'source_display_name' in doc:
+                source = doc['source_display_name']
+
+            if hasattr(doc, 'relevancy') and doc.relevancy:
+                score = f"{doc.relevancy:.2f}"
+            elif isinstance(doc, dict) and 'relevancy' in doc:
+                score = f"{doc['relevancy']:.2f}"
+
+            print(f"{Colors.BLUE}{Colors.BOLD}[{i}]{Colors.RESET} ", end='')
+
+            if source:
+                print(f"{Colors.GREEN}{source}{Colors.RESET}", end='')
+
+            if score:
+                print(f" {Colors.GRAY}(relevance: {score}){Colors.RESET}")
+            else:
+                print()
+
+            if snippet:
+                print(f"    {Colors.DIM}{snippet}{Colors.RESET}")
+
+            if i < min(5, count):
+                print(f"{Colors.GRAY}{'─' * 60}{Colors.RESET}")
+
+        print()
 
     def print_generating(self):
-        print(f"{Colors.CYAN}{Icons.DOT} Generating answer...{Colors.RESET}")
+        self.start_loading("Generating answer...")
 
     def print_answer(self, answer: str):
+        self.stop_loading()
         print(f"\n{Colors.GREEN}{Colors.BOLD}Answer:{Colors.RESET}")
         print(f"{Colors.GRAY}{'─' * 50}{Colors.RESET}")
         print(f"{answer}")
