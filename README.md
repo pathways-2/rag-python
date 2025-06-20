@@ -54,7 +54,7 @@ OPENAI_API_KEY=your-openai-api-key-here
 #### For Vectorize Source (RAGSourceType.VECTORIZE)
 
 ```env
-OPENAI_API_KEY=your-openai-api-key-here
+OPENAI_API_KEY=your-openai-api-key
 VECTORIZE_PIPELINE_ACCESS_TOKEN=your-vectorize-token
 VECTORIZE_ORGANIZATION_ID=your-organization-id
 VECTORIZE_PIPELINE_ID=your-pipeline-id
@@ -63,7 +63,7 @@ VECTORIZE_PIPELINE_ID=your-pipeline-id
 #### For Pinecone Source (RAGSourceType.PINECONE)
 
 ```env
-OPENAI_API_KEY=your-openai-api-key-here
+OPENAI_API_KEY=your-openai-api-key
 PINECONE_API_KEY=your-pinecone-api-key
 PINECONE_ENVIRONMENT=your-pinecone-environment
 PINECONE_INDEX_NAME=your-pinecone-index-name
@@ -72,7 +72,7 @@ PINECONE_INDEX_NAME=your-pinecone-index-name
 #### For No External Source (RAGSourceType.NONE)
 
 ```env
-OPENAI_API_KEY=your-openai-api-key-here
+OPENAI_API_KEY=your-openai-api-key
 ```
 
 ## Getting API Keys
@@ -244,3 +244,102 @@ elif RAG_SOURCE == RAGSourceType.MY_NEW_SOURCE:
 - `python-dotenv` - Environment variable management
 
 See `pyproject.toml` for complete dependency list.
+
+                    ┌─────────────────────────────────────────────────────────────────────┐
+                    │                         RAG PYTHON SYSTEM                          │
+                    │                      Architecture Overview                         │
+                    └─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────┐      ┌─────────────────────────────────────────────────────────────────┐
+│                 │      │                                                                 │
+│      USER       │      │                    CLI INTERFACE                               │
+│   (Terminal)    │◄────►│                (cli_interface.py)                              │
+│                 │      │                                                                 │
+│  • Questions    │      │ • Welcome Banner        • Status Display                      │
+│  • Commands     │      │ • User Input           • Document Previews                    │
+│  • Ctrl+C       │      │ • Colored Output       • Error Messages                      │
+└─────────────────┘      │ • Loading Animations   • Exit Instructions                   │
+                         └─────────────────┬───────────────────────────────────────────────┘
+                                           │
+                                           ▼
+                         ┌─────────────────────────────────────────────────────────────────┐
+                         │                                                                 │
+                         │                     RAG CHAT                                   │
+                         │                  (rag_chat.py)                                 │
+                         │                                                                 │
+                         │ • Question Processing    • Context Formatting                  │
+                         │ • Document Integration   • Response Generation                 │
+                         │ • Flow Orchestration     • Error Handling                     │
+                         └─────────────────┬───────────────────────────────────────────────┘
+                                           │
+                                           ▼
+                ┌──────────────────────────────────────────────────────────────────────────┐
+                │                    RAG SOURCE SELECTION                                 │
+                │                 (Based on RAG_SOURCE config)                           │
+                └──────────────────────────────────────────────────────────────────────────┘
+                                           │
+                        ┌──────────────────┼──────────────────┐
+                        │                  │                  │
+                        ▼                  ▼                  ▼
+        ┌─────────────────────┐   ┌─────────────────────┐   ┌─────────────────────┐
+        │                     │   │                     │   │                     │
+        │   VECTORIZE SOURCE  │   │   PINECONE SOURCE   │   │     NO SOURCE       │
+        │ (vectorize_wrapper) │   │ (pinecone_wrapper)  │   │   (RAGSourceType.   │
+        │                     │   │                     │   │       NONE)         │
+        │ • Document Search   │   │ • Vector Search     │   │                     │
+        │ • Relevance Scoring │   │ • Embedding Match   │   │ • Direct to OpenAI  │
+        │ • Source Metadata   │   │ • Mock Implementation│  │ • No Doc Retrieval  │
+        └─────────────────────┘   └─────────────────────┘   └─────────────────────┘
+                │                           │                           │
+                │                           │                           │
+                ▼                           ▼                           │
+        ┌─────────────────────┐   ┌─────────────────────┐               │
+        │                     │   │                     │               │
+        │   VECTORIZE.IO      │   │   PINECONE API      │               │
+        │    (External)       │   │   (External)        │               │
+        │                     │   │                     │               │
+        │ • Pipeline Access   │   │ • Index Queries     │               │
+        │ • Token Auth        │   │ • Environment       │               │
+        │ • Org/Pipeline IDs  │   │ • API Key Auth      │               │
+        └─────────────────────┘   └─────────────────────┘               │
+                │                           │                           │
+                └───────────┬───────────────┘                           │
+                            │                                           │
+                            ▼                                           │
+                ┌─────────────────────────────────────────────────────────┐
+                │                                                         │
+                │              CONTEXT FORMATTING                         │
+                │                                                         │
+                │ • Document Collection    • Relevance Scores             │
+                │ • Source Attribution     • Text Extraction              │
+                │ • Content Organization   • Context Assembly             │
+                └─────────────────────┬───────────────────────────────────┘
+                                      │
+                                      ▼
+                ┌─────────────────────────────────────────────────────────────────────────┐
+                │                                                                         │
+                │                         OPENAI INTEGRATION                             │
+                │                         (via LiteLLM)                                  │
+                │                                                                         │
+                │ Model: gpt-4o-mini                                                     │
+                │                                                                         │
+                │ System Prompt:                                                         │
+                │ ├─ "You are a helpful assistant..."                                   │
+                │ └─ "Base your answers on provided context..."                         │
+                │                                                                         │
+                │ User Message:                                                          │
+                │ ├─ Context: [Retrieved Documents]                                     │
+                │ └─ Question: [User Query]                                             │
+                └─────────────────────┬───────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+                ┌─────────────────────────────────────────────────────────────────────────┐
+                │                                                                         │
+                │                       RESPONSE FLOW                                    │
+                │                                                                         │
+                │ OpenAI Response → RAG Chat → CLI Interface → User Terminal            │
+                │                                                                         │
+                │ • Generated Answer    • Response Processing    • Formatted Output     │
+                │ • Token Usage         • Error Handling        • Color Coding          │
+                │ • Completion Status   • Logging              • User Experience       │
+                └─────────────────────────────────
